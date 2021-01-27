@@ -1,0 +1,62 @@
+---
+title: "My Personal Portfolio"
+output:html_document: default
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+In this project, I will use R to create a representation of my personal portfolio as of November 11, 2019. I have about a year investing personally and this a summary of stocks I have equity in. I have seen  tutorials online with different methods of pulling stock information but since I am still learning to use R I will use the process which made most sense to me. My thought process is illustrated below.
+
+First, I need to enable the quantmod and PerformanceAnalytics package. Next, I saved all the stock ticker symbols into one variable
+```{r}
+library(quantmod)
+library(PerformanceAnalytics)
+stocks<- c("VER","LTC","SLY","SPLV","EQIX","NOBL","WTR","AWK","ABR","V","SHV")
+```
+
+## Prices
+Now using the <i>getSymbols</i> function and a loop, we pull all the closing prices for each stock starting on November 1st. Since my final product will essentially be a snapshot in time, I save only the prices from the first day of November to create that.
+```{r}
+closing<- NULL
+for (Ticker in stocks) closing<- cbind(closing, getSymbols.yahoo(Ticker,from = "2019-11-01",verbose=FALSE, auto.assign=FALSE)[,4])
+closing
+## November 1st data
+closing<- closing[1,]
+```
+
+## Presenting My Porfolio
+Now that I have the data that I am interested in, I combined all my variables into a dataframe. I start by creating a variable that contains the number of shares of stock that I own. The closing prices are not in a proper format to be added to a dataframe, so I have to reformat the prices as a matrix. Now my portfolio is summarized as a dataframe!
+
+```{r}
+shares<- c(35,3,10,15,2,14,20,8,75,6,3)
+price<- matrix(as.vector(closing),ncol=1)
+portfolio<- data.frame(ticker = stocks, shares = shares, price = price)
+portfolio
+```
+
+There are many ways to display data and still communicate useful information. If I were to present my porfolio to a client or investor, they would most likely be interested in the composition of my portfolio. One way to get a clearer understanding of a portfolio's composition is through a pie chart.
+```{r}
+portfolio$equity<- portfolio$shares*portfolio$price
+labels<-paste(round(portfolio$equity*100/sum(portfolio$equity),0),"%", sep = "")
+
+pie(portfolio$equity, labels = labels,main = "Personal Portfolio Value at 11/1/2019", col = rainbow(length(stocks)))
+legend("bottomright", legend = portfolio$ticker, cex = .8, fill = rainbow(length(stocks)))
+```
+
+To someone who knows these companies, this information might be useful to them. This pie chart is too specific and if I really wanted to present my porfolio to someone, they might be more concerned with the industries I'm invested in. 
+
+Adding a industry column sounds like a good idea. Once I create the column, I'll recreate the same pie chart but based on industries rather than the individual stocks.
+
+```{r}
+portfolio$industry<- c("Real Estate","Real Estate","Index ETF","Index ETF","Technology", "Index ETF","Water","Water","Real Estate","Financial","Bonds")
+industrydata<-aggregate( portfolio$equity, by =list(portfolio$industry), FUN = sum)
+industrydata$percent<- paste(round(industrydata[,2]*100/sum(industrydata[,2]),0),"%", sep = "")
+colnames(industrydata[,1-2])<- c("industry","equity")
+pie(industrydata[,2], labels = industrydata[,3], main = "Personal Portfolio Value at 11/1/2019", col = rainbow(length(industrydata[,1])))
+legend("bottomright", legend = industrydata[,1], cex = .8, fill = rainbow(length(industrydata[,1])))
+```
+

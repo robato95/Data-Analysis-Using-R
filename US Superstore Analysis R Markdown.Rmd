@@ -1,0 +1,260 @@
+---
+title: "US Superstore Analysis"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    storyboard: true
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(scales)
+library(usmap)
+library(tidyverse)
+
+## US Superstore data
+setwd("/Users/robertvargas/Documents/Projects/R/US Superstore ")
+data<- read.csv("US Superstore data.csv")
+sales<- round(sum(data$Sales),0)
+gross_profit<- round(sum(data$Profit),0)
+gross_profit_percent<- gross_profit/sales
+
+```
+Understanding the data
+===
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Chart A
+```{r}
+valueBox(value = format(length(unique(data$Order.ID)), big.mark = ",", scientific = FALSE) , caption = "Number of Orders", color = "chocolate")
+
+```
+
+-----------------------------------------------------------------------
+
+### Chart B
+```{r}
+valueBox(value = format(nrow(data), big.mark = ",", scientific = FALSE), caption = "Total Products Sold", color = "chocolate")
+
+```
+
+-----------------------------------------------------------------------
+
+### The company sells products that are classified into these various sub-categories. As the histogram indicates, paper and binders have been the two most popular items during the past four years.
+```{r}
+par(mar = c(4,5.5,5.5,1))
+barplot(table(data$Sub.Category), las = 1, horiz = TRUE, xlim = c(0,1800), xlab = "No. of Products Sold", main = "Product Lines", col = "chocolate")
+```
+
+
+Row {data-width=650}
+-----------------------------------------------------------------------
+
+### Objective
+This is a simple data set of US superstore from 2014-2018, obtained from Kaggle. The column names reveal what type of information is revealed in the data set. Using high level metrics we see how successful the company has been in generating sales and the total profit earned over the past four years. I will analyze specific attributes on a high level and won't examine the attributes on an annual basis, with the objective to explore recomendations the company can implement to earn 15% gross profit over the next four years.
+```{r}
+colnames(data)
+```
+
+-----------------------------------------------------------------------
+
+### Chart C
+```{r}
+valueBox(value = format(sales, big.mark = ",", scientific = FALSE), caption = "Total Sales", color = "darkgreen")
+
+```
+
+
+-----------------------------------------------------------------------
+
+### Chart D
+```{r}
+valueBox(value = format(gross_profit, big.mark = ",", scientific = FALSE), caption = "Total Profit", color = "red")
+
+```
+
+-----------------------------------------------------------------------
+
+### Chart E
+```{r}
+valueBox(value = percent(gross_profit_percent), caption = "Gross Profit Percentage", color = "blue")
+
+```
+
+Demographics
+===
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Chart 1 - Note:Texas is considered a "central" region in the data set.
+```{r}
+orders_by_region<- table(data$Region)
+barplot(orders_by_region, ylim = c(0,4000), main = "No. of Products Sold by Region", col = "red" )
+```
+
+-----------------------------------------------------------------------
+
+### Chart 2
+```{r}
+profit_by_region <- aggregate(data$Profit, by = list(data$Region), FUN = sum)
+barplot(profit_by_region$x, yaxt = 'n', names.arg = c("Central", "East", "South", "West"), col = "red", main = "Total Profit by Region")
+axis(side =2, at = seq(0,160000,20000))
+
+```
+
+
+Row {data-width=650}
+-----------------------------------------------------------------------
+
+### Map 1 - Disclaimer: There aren't any sales associated with Alaska or Hawaii so these states have been omitted from the charts.
+```{r}
+orders_by_state<- aggregate(data$Order.ID, by = list (data$State), FUN = length)
+orders_by_state$fips<- fips(orders_by_state$Group.1)
+colnames(orders_by_state)<- c("state", "orders", "fips")
+plot_usmap(data = orders_by_state, values = "orders", exclude = c("Alaska", "Hawaii")) +
+  scale_fill_continuous( low = "darkkhaki", high = "darkgreen", name = "No. of Products", label = scales::comma)+
+  theme(legend.position = "right") +
+  theme(panel.background = element_rect(colour = "black")) + 
+  labs(title = "Products Sold by State", caption = "robato_95")
+```
+
+-----------------------------------------------------------------------
+
+### Map 2
+```{r}
+profit_by_state<- aggregate(data$Profit, by = list (data$State), FUN = sum)
+profit_by_state$fips<- fips(profit_by_state$Group.1)
+colnames(profit_by_state)<- c("state", "profit", "fips")
+plot_usmap(data = profit_by_state, values = "profit", exclude = c("Alaska", "Hawaii")) +
+  scale_fill_continuous( low = "darkkhaki", high = "darkgreen", name = "Profit ($)", label = scales::comma)+
+  theme(legend.position = "right") +
+  theme(panel.background = element_rect(colour = "black")) + 
+  labs(title = "Profit by State", caption = "robato_95")
+
+```
+
+
+Sale Analytics
+===
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Customers clearly tend to make multiple orders.
+```{r}
+customer_orders_data <- aggregate(data$Order.ID, by = list(data$Customer.ID), FUN = length)
+no_single_order_customers <- nrow(subset(customer_orders_data, x == 1))
+no_multiple_order_customers<- nrow(customer_orders_data) - no_single_order_customers
+
+par(mar = c(.25,.25,1,.25))
+pie(x = c(no_multiple_order_customers, no_single_order_customers), labels = c(788,5), main = "Porportion of Repeating ahd Single Order Customers", col = c("green", "yellow") )
+labels<-c("Repeating", "Single")
+legend("bottom",legend = labels, cex = .9, fill = c("green", "yellow"))
+
+```
+
+-----------------------------------------------------------------------
+
+### Chart A
+```{r}
+valueBox(value = nrow(customer_orders_data), caption = "Total Customers", color = "blue")
+```
+
+-----------------------------------------------------------------------
+
+### B
+```{r}
+valueBox(value = round(mean(customer_orders_data$x),0), caption = "Average No. of Orders per Customer", color = "purple")
+
+```
+
+Row {data-width=650}
+-----------------------------------------------------------------------
+
+### Gross profit percentages were calculated manually. Based on the information from the data set, product profits varied with each order so the average gross profit percentage was calculated for each product.
+```{r}
+data$GPperc<- round(data$Profit/data$Sales*100,0)
+gp_by_product<- aggregate(data$GPperc, by = list(data$Product.ID), FUN = mean)
+hist(gp_by_product$x, col = "purple", main = "Frequencies of Gross Profit Percentages", xlab = "Percentages", ylim = c(0,600))
+
+```
+
+-----------------------------------------------------------------------
+
+### The following quantiles represent the distribution of product quantities sold over the past four years. Any products sold at a frequency over the 3rd quantile will be referred to as fast moving.
+```{r}
+gp_by_product<- gp_by_product[which(gp_by_product$x >= 15),] 
+gp_by_product$x<- round(gp_by_product$x,0)
+sales_products<- aggregate(data$Row.ID, by = list(data$Product.ID), length)
+summary(sales_products$x)
+
+
+```
+
+
+
+
+Conclusion 
+===
+
+Row {data-width=300}
+-----------------------------------------------------------------------
+### Recommendations
+1. Make an effort to attratct more sales in states that have potential for growth. These states should already have a history of providing positive profit figures.
+2. Market a specific set of products. These products should have a history of fast moving sales and provide at least 15% gross profit.
+3. Hopefully with a number of new customers, there will be an increase in sales as we noted earlier that most if not all customers are repeat customers.
+
+Row {data-width=650}
+-----------------------------------------------------------------------
+
+### As we seen on the demographics tab, even though there are states that signficiantly purchase more products compared to the rest of the other regions, a great number of these states actually contribute negative margins as a whole, Texas being the largest contributor. Ideally the goal should be to implement efforts to grow sales in states where there is room for growth. States in green represent states that experienced less than 1,000 sales over the past four years. As we noted early, a handful of states contributed negative margins and we won't want to grow sales in those states since customers tend to purchase non-profitable products.
+
+
+```{r}
+complete_state_info<- data.frame( "state" = orders_by_state$state, "orders" = orders_by_state$orders, "profit" = profit_by_state$profit, "fips" = orders_by_state$fips)
+excluded_states <- complete_state_info$state[which(complete_state_info$orders > 1000 | complete_state_info$profit < 0 )]
+
+##plot_usmap(regions = "states",  exclude = excluded_states)
+
+library(ggplot2)
+library(dplyr)
+library(maps)
+`%notin%` <- Negate(`%in%`)
+excluded_states<- tolower(excluded_states)
+all_states<- map_data("state")
+ggplot(all_states, aes(x = long, y = lat, group = group)) +
+  geom_polygon(fill="red", colour = "white") +
+  geom_polygon(fill = "green",data = filter(all_states, region %notin% excluded_states))
+  
+
+
+```
+
+
+### If the company wants to reach the desired 15% gross profit percentage during the next four years, they should sell products that contain gross profit percentages equal to or greater than 15%. We identified the products that are fast moving, which are represented as the 3rd quantile (see third tab), and meet the objectives criteria. In order to filter through this large amount of potential products, lets choose products that are generally sold at a higher selling price and are over the 3rd quantile to maximize our potential revenue.
+
+```{r}
+gp_by_product$qty<- 0
+for (product in gp_by_product$Group.1){
+  gp_by_product$qty[which(gp_by_product$Group.1 == product)]<- sales_products$x[which(sales_products$Group.1 == product)]
+}
+gp_by_product<-gp_by_product[which(gp_by_product$qty >=7),]
+# pulling selling price
+selling_price_product<- aggregate(data$Sales, by = list(data$Product.ID), FUN = mean)
+gp_by_product$avg_sell_price<- 0
+for (product in gp_by_product$Group.1){
+  gp_by_product$avg_sell_price[which(gp_by_product$Group.1 == product)]<- selling_price_product$x[which(selling_price_product$Group.1 == product)]
+}
+gp_by_product$avg_sell_price<- round(gp_by_product$avg_sell_price,0)
+
+colnames(gp_by_product)<- c("Pro_ID", "GP%", "Qty_Sold","Avg_Price")
+summary(gp_by_product$Avg_Price)
+print("printing all products that meet our desired  criteria...")
+gp_by_product[which(gp_by_product$Avg_Price > 125),]
+
+```
+

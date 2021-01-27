@@ -1,0 +1,59 @@
+---
+title: "Height Distributions"
+author: "Robert Vargas"
+date: "1/15/2020"
+output: html_document
+---
+## Description
+The data below are the heights of fathers and their songs, based on an experiment by Karl Pearson in 1900. Heights are rounded to the nearest 0.1 inch. From my understanding of data, the most repeated example of normal distributions has always been heights. Due to my sense of curiosity, I decided to see if that is in the case. Using the same logic I would also think that the differences in heights between each son and his father is also normally distributed.
+
+```{r}
+setwd("/Users/robertvargas/Documents/Projects/R/Heights")
+data<- read.csv("Pearson.csv")
+summary(c(data$Father,data$Son))
+plot(data$Father,data$Son, xlab = "Father", ylab = "Son", main = "Heights Relationship Between Father and Sons")
+par(mfrow=c(1,2))
+hist(data$Father, main = "", xlab = "Father", ylim = c(0,200))
+abline( v= mean(data$Father), col = "blue", lwd =2)
+hist(data$Son, main = "", xlab = "Son", ylim = c(0,400))
+abline( v= mean(data$Son), col = "blue", lwd =2)
+```
+<br>Based on the appearance of the histogram, it appears that the frequencies follow a normal distribution. The mean is centered towards the center of the histogram and carries the largest of the frequencies. Another way to judge the data's normality would be plotting it into a Q-Q plot. A Q-Q plot displays the distribution of the data against the expected normal distribution. <br/>
+
+
+```{r}
+par(mfrow=c(1,2))
+qqnorm(data$Father)
+qqline(data$Father, col = "red", lwd = 2)
+qqnorm(data$Son)
+qqline(data$Son, col = "red", lwd = 2)
+
+par(mfrow=c(1,2))
+x<-data$Father
+hist(data$Father, freq=FALSE, col="gray", xlab="Father", main="")
+curve(dnorm(x, mean=mean(data$Father), sd=sd(data$Father)), add=TRUE, col="red")
+
+x<-data$Son
+hist(data$Son, freq=FALSE, col="gray", xlab="Son", main="")
+curve(dnorm(x, mean=mean(data$Son), sd=sd(data$Son)), add=TRUE, col="red")
+```
+
+## Results
+Father/Son heights follow the expected distributions for the most part. Once we plot the bell curve on the histograms we see that the frequencies follow a normal distribution. Though the histograms don't exactly follow the bell curves, one can tell that the majority of the data falls within the expected area.
+
+## Height differences
+Without any knowledge to the contrary (based on my limited knowledge of stats), I would believe the height difference between the family members in the experiment to be normally distributed as well.
+```{r}
+data$HeightDifferences<-(data$Son-data$Father)
+
+x<- data$HeightDifferences
+hist(data$HeightDifferences, freq = FALSE, col = "gray",main = "Height Differences", xlab = "Difference of Son's Height to Fathers") 
+curve(dnorm(x, mean=mean(data$HeightDifferences), sd=sd(data$HeightDifferences)), add=TRUE, col="red")
+
+qqnorm(data$HeightDifferences)
+qqline(data$HeightDifferences, col = "red", lwd = 2)
+```
+
+## Conclusion
+Similar to the unadjusted heights, the height differences appear to follow the boundaries proposed by the bell curve. I also plotted the Q-Q plots and saw that the distribution seemed to be normal as well.
+

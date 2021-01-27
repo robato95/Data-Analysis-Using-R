@@ -1,0 +1,66 @@
+---
+title: "Replicating the IB Math Studies Internal Assessment Using R"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Summary of Investigation
+
+The main purpose of the investigation is to determine whether there is a relationship between a runner's weight and their mile run time. The International School of Bangkok collected data from 30 male students from ISB, Ekkamai International School, and American School of Bangkok.
+
+I replicated the analysis using R. See the original assessment through the following link:
+
+https://www.slideshare.net/shinchang1211/what-is-the-relationship-between-the-weight-and-the-mile-run-time
+
+## Pulling the Data into RStudio
+The investigation pulled a sample of 30 students, I copied the data into a CSV file. I proceeded to import that file into my RStudio Console and saved it under variable "MileData".
+
+```{r}
+setwd("/Users/robertvargas/Documents/Projects/R/WeightMile Project")
+MileData<- read.csv(file = "IBMathStudies.csv")
+
+```
+
+## Analysis
+Now that we have the data imported into our Console, let's take quick look
+```{r}
+MileData
+```
+Everything seems to be in order, the data is a copy of the original sample. Let's plot the data now.
+```{r}
+plot(MileData$Weight, MileData$Seconds,col = "red", type = "p",pch = 16, xlab = "Weight (kg)", ylab = "Time (Secs)", main = "Relationship Between Weight and Mile Run Time")
+```
+
+
+The investigation goes on to calcluate the standard deviations for weight and time, the regression formula between the two variables, RSquared for the variables, and finally the correlation between weight and the mile time.
+
+R allows us to recalculate those same metrics  :
+```{r}
+SDWeight<- sd(MileData$Weight)
+SDTime<- sd(MileData$Seconds)
+paste("The SD for weight is", round(SDWeight,2))
+paste("The SD for time is", round(SDTime,2))
+## we are able to pull the regression info using the following script, we save it as RegressionStats 
+RegressionStats<- lm(MileData$Seconds ~ MileData$Weight)
+##These are the coeffecients
+coef(RegressionStats)
+##This is r-squared
+summary(RegressionStats)$r.squared
+```
+
+Now lets graph the data with the regression line!
+```{r}
+plot(MileData$Weight, MileData$Seconds,col = "red", type = "p",pch = 16, xlab = "Weight (kg)", ylab = "Time (Secs)", main = "Relationship Between Weight and Mile Run Time") + abline(RegressionStats)
+```
+
+
+We can see how the regression line compares to the actual data, if you recall above our RSquared is 74%. This essentially means that our regression formula explains 74% of our sample data, meaning 26% of our data is unexplained for. The graph shows that there is a correlation of .86 between weight and time as shown below.
+```{r}
+cor(MileData$Seconds,MileData$Weight)
+```
+
+## Conclusion
+The investigation does not state how the calculations were done (by hand, calculator, excel, etc.). Using R programming I was able to calculate and analyze the same data that the assessment investigated. Ultimately, we came to the same results (differences may arise from rounding) and conclusions. 

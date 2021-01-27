@@ -1,0 +1,293 @@
+---
+title: "Supermarket Sales"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(ggplot2)
+library(dplyr)
+getwd()
+setwd("/Users/robertvargas/Documents/Projects/R/Supermarket sales")
+data<- read.csv("supermarket_sales - Sheet1.csv")
+
+##context - create quarterly report
+## give context of sales
+print("total sales for Q1 were...")
+total_sales = format(round(sum(data$Total),0), big.mark = ",", scientific = FALSE)
+#pie chart - sales efrom each branch
+branch_sales<- aggregate(data$Total, by = list(data$Branch), FUN = sum)
+  colnames(branch_sales)<- c("Branch", "Q1_Sales")
+  branch_sales$Q1_Sales<- round(branch_sales$Q1_Sales,0)
+  branch_sales$prop<- round(branch_sales$Q1_Sales/ sum(branch_sales$Q1_Sales)*100,0)
+branch_sales<- branch_sales %>% arrange(desc(Branch)) %>% mutate(ypos = cumsum(prop) - 0.5*prop)
+ 
+sales_pie_chart <- ggplot(branch_sales, aes( x = "", y = prop, fill = Branch)) +
+  geom_bar(width = 1, stat = "identity", color = "white") +
+  coord_polar("y", start = 0 ) +
+  geom_text(aes(y = ypos, label = paste(prop,"%")), color = "white") +
+  scale_fill_manual(values = c("#0073C2FF", "#EFC000FF", "#CD534CFF")) +
+  ggtitle("Branch Sales as % of Total") +
+  theme_void()
+
+#bar plot, sales by for each product line
+sales_by_product_line = aggregate(data$Total, by = list(data$Product.line), FUN = sum)
+  colnames(sales_by_product_line)<- c("Product", "Q1_Sales")
+  sales_by_product_line$Q1_Sales = round(sales_by_product_line$Q1_Sales,0)
+
+sales_barplot<- ggplot(data = sales_by_product_line, aes( x = Product, y = Q1_Sales)) +
+  geom_bar(stat = "identity", fill = "#0073C2FF", color = "black" ) +
+  labs(y = "Sales ($)" ) +
+  ggtitle("Product Line Sales") +
+  coord_flip( )
+  
+## double bar graph, member/gender
+customer_freq_table<- table(data$Gender, data$Customer.type)
+customer_freq_table<- as.data.frame(customer_freq_table)
+colnames(customer_freq_table) <- c("Gender", "Membership", "Freq")
+
+
+customer_barplot <- ggplot(data = customer_freq_table, aes(x = Gender, y = Freq, condition = Gender, fill = Gender)) +
+  facet_wrap(~ Membership) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_manual(values = c("#0073C2FF", "#EFC000FF")) +
+  ggtitle("Customer Analytics") +
+  labs(x = "", y = "") +
+  theme_minimal()
+
+#overall shopping experience
+mean_rating = mean(data$Rating)
+median_rating = median(data$Rating)
+customer_hist <- ggplot(data = data, aes(x = data$Rating)) +
+  geom_histogram(binwidth = .5, color = "black", fill = "#0073C2FF") +
+  ggtitle("Customer Ratings Frequency") +
+  labs( x = "Rating Scale from 1 - 10", y = "")
+  theme_minimal()
+
+#exploratory data analysis
+#sales forecast per week, day
+data$Date<- as.Date(data$Date, format = "%m/%d/%Y")
+sales_forecast<- aggregate(data$Total, by = list(data$Date), FUN = sum)
+  sales_forecast<- as.data.frame(sales_forecast)
+  colnames(sales_forecast) <- c("Date","Total_Sales")
+  sales_forecast$Total_Sales<- round(sales_forecast$Total_Sales, 0)
+  
+sales_forecast_graph <- ggplot(sales_forecast, aes( x = Date, y = Total_Sales)) +
+  geom_line( color = "#CD534CFF") +
+  ggtitle("Sales Forecast for Quarter 1") +
+  labs( x = "Month")
+  ##break into weeks
+sales_forecast$Week<- as.Date(cut(sales_forecast$Date, breaks = "week", start.on.monday = FALSE))
+weekly_sales_graph <- ggplot(data = sales_forecast, aes(x = Week, y = Total_Sales)) +
+  stat_summary(fun.y = sum, geom = "bar", fill = "#CD534CFF", color = "black") +
+  ggtitle("Sales Forecast by Week")
+
+# timeline of no of purchases
+data$Day<- weekdays(data$Date)
+data$Day<- as.factor(data$Day)
+total_order_by_days<- aggregate(data$Invoice.ID, by = list(data$Day), FUN = length)
+  total_order_by_days<- as.data.frame(total_order_by_days)
+  colnames(total_order_by_days)<- c("Day", "Total_Orders")
+
+total_orders_per_day <- ggplot(total_order_by_days, aes(x = Day, y = Total_Orders)) +
+  geom_bar(stat = "identity", color = "black", fill = "#EFC000FF") +
+  ggtitle("Total Orders per Day") +
+  labs (y = "No. of Orders")
+
+avg_sale_pmttype<- aggregate(data$Total,by = list(data$Payment), FUN = mean)
+  avg_sale_pmttype<- as.data.frame(avg_sale_pmttype)
+  colnames(avg_sale_pmttype)<- c("Payment_type", "Avg_Trans_Amount")
+  avg_sale_pmttype$Avg_Trans_Amount<- paste("$",round(avg_sale_pmttype$Avg_Trans_Amount,0))
+
+##total sales per hour
+data$Hour<- substr(data$Time,1,2)
+total_orders_hour<- aggregate(data$Invoice.ID, by = list(data$Hour), FUN = length)
+total_orders_hour<- as.data.frame(total_orders_hour)
+colnames(total_orders_hour)<- c("Hour", "Total_Orders")
+
+hour_barplot<- ggplot(total_orders_hour, aes ( x = Hour, y = Total_Orders )) +
+  geom_bar(stat = "identity", color = "black", fill = "#EFC000FF") +
+  ggtitle("Total Orders per Hour") +
+  labs( y = "No. of Orders")
+
+## sales per month 
+data$Month<- format(data$Date, "%m")
+sales_per_month<- aggregate(data$Total, by = list(data$Month), FUN = sum)
+  sales_per_month<- as.data.frame(sales_per_month)
+  colnames(sales_per_month) <- c("Month", "Total_Sales")
+  sales_per_month$Total_Sales<- format(round(sales_per_month$Total_Sales,0), big.mark = ",", scientific = FALSE)
+
+## customer aggregate
+  customer_info_sumsales<- aggregate(data$Total, by = list( data$Customer.type, data$Gender, data$Product.line, data$Day), FUN = sum)
+  customer_info_sumsales<- as.data.frame(customer_info_sumsales)
+  colnames(customer_info_sumsales)<- c("Customer","Gender", "Product", "Day", "Sales")
+  customer_info_sumsales$Sales<- round(customer_info_sumsales$Sales,0)
+  
+  
+  customer_info_nosales<- aggregate(data$Total, by = list( data$Customer.type, data$Gender, data$Product.line, data$Day), FUN = length)
+  customer_info_nosales<- as.data.frame(customer_info_nosales)
+  colnames(customer_info_nosales)<- c("Customer","Gender", "Product", "Day", "Orders")
+
+  
+```
+
+Sales Summary
+===
+Row 
+-----------------------------------------------------------------------
+
+### Chart A
+```{r}
+valueBox(value = total_sales , caption = "Total Sales for Q1 2019", color = "green")
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Branch Performance
+```{r}
+sales_pie_chart
+```
+
+### Product Performance
+```{r}
+sales_barplot
+```
+
+
+Forecasts
+===
+
+Row 
+-----------------------------------------------------------------------
+### Chart
+```{r}
+valueBox(sales_per_month[1,2], caption = "January", color = "green")
+```
+
+### Chart
+```{r}
+valueBox(sales_per_month[2,2], caption = "February", color = "green")
+```
+
+### Chart
+```{r}
+valueBox(sales_per_month[3,2], caption = "March", color = "green")
+
+```
+
+
+
+
+Row 
+-----------------------------------------------------------------------
+
+### Monthly Performance
+```{r}
+sales_forecast_graph 
+```
+
+### Weekly Performance
+```{r}
+weekly_sales_graph
+```
+
+
+Customer Analytics
+===
+Row 
+-----------------------------------------------------------------------
+
+### Average Customer Rating 
+```{r}
+gauge(round(mean_rating,2), min = 0 , max = 10)
+
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Demographics
+```{r}
+customer_barplot
+```
+
+### Quality of Shopping Experience
+```{r}
+customer_hist
+```
+
+Shopping Behavior
+===
+
+Row 
+-----------------------------------------------------------------------
+### Daily Performance
+```{r}
+total_orders_per_day
+```
+
+### Hourly Performance
+```{r}
+hour_barplot
+```
+
+Row 
+-----------------------------------------------------------------------
+### Chart C
+```{r}
+valueBox(value = avg_sale_pmttype[1,2] , caption = "Average Cash Transaction", color = "blue")
+
+```
+
+### Chart D
+```{r}
+valueBox(value = avg_sale_pmttype[2,2] , caption = "Average Credit Transaction", color = "red")
+```
+
+### Chart E
+```{r}
+valueBox(value = avg_sale_pmttype[3,2] , caption = "Average Ewallet Transaction", color = "green")
+```
+
+Final Results
+===
+
+Row 
+-----------------------------------------------------------------------
+### Sales Activity
+- Branch B earned the most revenue but each branch generated approximately 33-34% of total sales.
+- The best selling products were "Food and beverages", "Sports and travel" was a close second.
+- Sales were highest in January, despite sales being the lowest during the first week of January.
+- Sales momentum dipped slightly during mid-February. 
+
+Row 
+-----------------------------------------------------------------------
+### Demographics
+- The average customer experience rating was below 7, which might be concerning. The company recieved no ratings below a 4. 
+- Most of the customers in quarter 3 were either female members or non-member males.
+- Most orders were made on a Saturday or a Tuesday. Monday generally has the lowest frequency of orders. 
+
+
+Row 
+-----------------------------------------------------------------------
+### Other
+- Most sales were made during 7pm (19) and the least amount of sales occurred during the hours between 4-5pm (16-17) and an hour from closing (20).
+- Method of payment has very little influence on the customers transaction amount, as the average transaction amount for each payment type are consistent within $7.
+
+Column 
+-----------------------------------------------------------------------
+
+### The customer who made the most orders can be categorized by the following demographics:
+```{r}
+head(customer_info_nosales[order(-customer_info_nosales$Orders),],1)
+```
+
+### The customer who generated the most sales can by categorized by the following demographics:
+```{r}
+head(customer_info_sumsales[order(-customer_info_sumsales$Sales),],1)
+```
+

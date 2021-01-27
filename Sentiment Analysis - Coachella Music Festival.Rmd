@@ -1,0 +1,156 @@
+---
+title: "Sentiment Analysis - Coachella Music Festival"
+author: "Robert Vargas"
+date: "6/20/2020"
+output: html_document
+---
+
+```{r, results='hide'}
+library(tidyverse)
+library(dplyr)
+library(tibble)
+library(tidytext)
+setwd("/Users/robertvargas/Documents/Projects/Data")
+wk1<- read.csv("Coachella_2019_Tweets_Weekend_1_2019-04-07_to_2019-04-16.csv", header = TRUE)
+wk2<- read.csv("Coachella_2019_Tweets_Weekend_2_2019-04-14_to_2019-04-23.csv", header = TRUE)
+wk1<- wk1 %>% select(1,2,3,5,9,10,23,24)
+wk2<- wk2 %>% select(1,2,3,5,9,10,23,24)
+
+```
+
+## Feature Engineering
+In order to better understand the data, I will manually engineer certain columns to learn more about twitter activity surrounding the activity. After these updates I should be able to tell which tweets are organic, the date and time the tweet occurred, and will copy the contents of each tweet into another column.
+
+```{r}
+#organic
+wk1$organic<- NA
+wk2$organic<- NA
+wk1$organic[wk1$reply_to_tweet_id == "None"]<-"organic"
+wk1$organic[wk1$reply_to_tweet_id != "None"]<-"non-organic"
+wk2$organic[wk2$reply_to_tweet_id == "None"]<-"organic"
+wk2$organic[wk2$reply_to_tweet_id != "None"]<-"non-organic"
+#date formatting
+wk1$clean_date<- "2019-4-  "
+wk2$clean_date<- "2019-4-  "
+substr(wk1$clean_date, start = 8, stop = 10)<- substring(wk1$created_at, 9,10)
+substr(wk2$clean_date, start = 8, stop = 10)<- substring(wk2$created_at, 9,10)
+wk1$clean_date<- as.character(wk1$clean_date)
+wk2$clean_date<- as.character(wk2$clean_date)
+wk1$clean_date<- as.Date(wk1$clean_date)
+wk2$clean_date<- as.Date(wk2$clean_date)
+#time
+wk1$clean_time<- NA
+wk2$clean_time<- NA
+wk1$clean_time<- substr(wk1$created_at, start = 12, stop = 19)
+wk2$clean_time<- substr(wk2$created_at, start = 12, stop = 19)
+#transform both data
+wk1$clean_datetime<- NA
+wk2$clean_datetime<- NA
+wk1$clean_datetime<- as.POSIXct(paste(wk1$clean_date, wk1$clean_time), format = "%Y-%m-%d %H:%M:%S")
+wk2$clean_datetime<- as.POSIXct(paste(wk2$clean_date, wk2$clean_time), format = "%Y-%m-%d %H:%M:%S")
+##copy tweets
+wk1$original_tweet<- wk1$full_tweet_text
+wk2$original_tweet<- wk2$full_tweet_text
+
+```
+
+## Analyzing the Data
+Approx. 80% of the tweets were original and organic tweets. That is a lot of twitter users considering the amount tweets per each weekend.
+
+```{r, echo= FALSE}
+ratio1<- paste(100*round(prop.table(table(wk1$organic)),2), "%", sep = "")
+ratio2<- paste(100*round(prop.table(table(wk2$organic)),2), "%", sep = "")
+tweet<- c("Organic","Non-organic")
+pie(table(wk1$organic), labels = ratio1, col = rainbow(length(tweet)), main = "Weekend 1 Tweets")
+legend("bottom", legend = tweet, cex = .8, fill = rainbow(length(tweet)))
+pie(table(wk2$organic), labels = ratio2, col = rainbow(length(tweet)), main = "Weekend 2 Tweets") 
+legend("bottom", legend = tweet, cex = .8, fill = rainbow(length(tweet)))
+##Amount of original tweets
+paste("There are", nrow(wk1)*.8,"tweets for weekend 1.")
+paste("There are", nrow(wk2)*.79,"tweets for weekend 2.")
+
+```
+
+I removed stop words and certain patterns of words that aren't helpful. In computing, stop words are words which are filtered out before or after processing of natural language data. Doing so required further featured engineering. These words included the beginning of links, general descriptions of Coachella, and just odd text in general.
+```{r}
+wk1$full_tweet_text<- gsub("https.*", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("de", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("coach", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("en", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("i’m", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("coachella2019", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("la", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("live", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("el", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("2019", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("se", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("performance", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("youtube*", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("weekd", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("coachella", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("festival", "", wk1$full_tweet_text)
+wk1$full_tweet_text<- gsub("music", "", wk1$full_tweet_text)
+
+wk2$full_tweet_text<- gsub("https*", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("coachella", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("t.co*", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("de", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("en", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("2*", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("019", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("i’m", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("live", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("の", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("weekd", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("love", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("la", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("coachel", "", wk2$full_tweet_text)
+wk2$full_tweet_text<- gsub("performance", "", wk2$full_tweet_text)
+##Removing the stop words
+z<-wk1 %>% select (full_tweet_text) %>% unnest_tokens(word, full_tweet_text)
+z<- z %>% anti_join(stop_words)
+
+zz<-wk2 %>% select (full_tweet_text) %>% unnest_tokens(word, full_tweet_text)
+zz<- zz %>% anti_join(stop_words)
+
+```
+
+## Drawing a conclusion
+## Weekend 1
+After formatting the data, we pull the top 10 most used words in tweets. In addition to that I pulled the top 10 most retweeted tweets and the 10 most liked tweets.
+```{r}
+z %>% count(word, sort = TRUE)
+
+x<- rownames(head(wk1[order(wk1$retweet_count, decreasing = TRUE),],10))
+wk1$original_tweet[as.integer(x)]
+
+x<- rownames(head(wk1[order(wk1$favorite_count, decreasing = TRUE),],10))
+wk1$original_tweet[as.integer(x)]
+
+```
+By looking at the top 10 words for weekend 1, it appears the most talked about performers were Blackpink, Ariana (Ariana Grande), and YG. Though it doesn't give us much context into what specifically made them standout, we can agree that it got people talking. Looking at the top tweets, I see that some popular performances were those by Khalid and Billie Eilish, YG, Beyonce, and J. Balvin.
+
+## Weekend 2
+```{r}
+zz%>%
+  count(word,sort = TRUE)%>%
+  top_n(10)%>%
+  mutate(word = reorder(word,n))%>%
+  ggplot(aes(x = word, y = n)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  theme_classic() +
+  labs(x = "Count", y = "Unique Word in Tweets", title = "Coachella 2019 Weekend 2", subtitle = "Stop words removed from the list")
+##top 10 most retweeted tweets
+
+y<- rownames(head(wk2[order(wk2$retweet_count, decreasing = TRUE),],10))
+wk2$original_tweet[as.integer(y)]
+
+y<- rownames(head(wk1[order(wk2$favorite_count, decreasing = TRUE),],10))
+wk2$original_tweet[as.integer(y)]
+
+```
+Twitter activity for weekend 2 closely resembled weekend 1 but also had its own talking points. For starters the top 10 most used words were still related to Ariana Grande and Blackpink. The 4th top used word is Beyonce, who was one of the headlines for both weekends. One key difference between both events was the performance of the Sunday Service by Kanye West, which he exclusively performed for the weekend 2 audience only. As we see, words related to the Sunday service were consistently used in tweets.
+
+So by looking at the most tweeted and popular tweets for weekend 2 its fairly obvious that Beyonce stole the show. Ariana Grande and Blackpink were still one of the most popular performances.

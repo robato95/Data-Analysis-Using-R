@@ -1,0 +1,66 @@
+---
+title: "Accounts Payable Analysis Using Benford Analysis"
+author: "Robert Vargas"
+date: "12/22/2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+Benford's Law is used to assist in the auditing of specific transactions or balances. Principles of Benford's Law explains that we can identify potential fraudlent transactions by comparing actual patterns of leading digits to the expected patterns indicated by the law.
+```{r}
+library(benford.analysis)
+setwd("/Users/robertvargas/Documents/Projects/R/Benford's Law Data")
+PBCdata<- read.csv("AP Data.csv")
+```
+
+Lets double check that the sum of the invoices ties to our CSV file. I don't need every column in order to conduct the analysis, so I include only the columns I need. Vendor names will be excluded.
+```{r}
+colnames(PBCdata)
+PBCdata<- PBCdata[,c(1,3,4,7)]
+str(PBCdata$Invoice.Amt)
+## our data at this point is a factor, we need to convert it to numeric values
+PBCdata$Invoice.Amt<- as.character(PBCdata$Invoice.Amt)
+PBCdata$Invoice.Amt<- gsub(",","",PBCdata$Invoice.Amt)
+PBCdata$Invoice.Amt<-as.numeric(PBCdata$Invoice.Amt)
+sum(PBCdata$Invoice.Amt)
+## it appears we have NA values, let's find those and flush them out
+which(is.na(PBCdata$Invoice.Amt))
+PBCdata<- PBCdata[-c(1232),]
+sum(PBCdata$Invoice.Amt)
+## this sum ties to the total payables balance at year-end
+```
+ <br><br />
+The data doesn't exactly conform to Benford's Law (see below). The shape of the plotted frequencies isn't too unusual but there are clear discrepancies at digits 52 and 11. Judgement comes into play when creating these analytics, many times there are transactions that are repeat transactions that would throw off the frequencies. 
+```{r}
+bfd<- benford(PBCdata$Invoice.Amt, number.of.digits = 2)
+plot(bfd)
+```
+
+Let's see if there are any repeat transactions. Without too much knowledge of the client's operations, I would assume there is a reason that a transactions would occur more than 3 times. It might make sense to analyze these as well but I will remove them from our sample to re-run our analysis. 
+```{r}
+library(plyr)
+frequencies<-as.data.frame(count(PBCdata,"Invoice.Amt"))
+repamounts<- subset(frequencies, freq >=3)
+exclude<- which(frequencies$freq >= 3)
+extransactions<- repamounts$Invoice.Amt
+'%notin%'<- Negate('%in%')
+ALTdata<- PBCdata[PBCdata$Invoice.Amt %notin% extransactions,]
+REPtransactions<- PBCdata[PBCdata$Invoice.Amt %in% extransactions,]
+bfd2<- benford(ALTdata$Invoice.Amt, number.of.digits = 2)
+plot(bfd2)
+
+```
+
+# Samples Selections
+We can go ahead and select a sample of transactions that fall out of the frequencies stated by Benford's Law. Let's go with 25 selections, 15 from our Benford's Law population and 10 from the population of repeated that transactions that we created earlier. Selections from the excluded transactions will be entirely judgmental, given the frequency of these transactions could be related to certain operational activities.
+```{r}
+## get sample from both variables
+getSuspects(bfd2,ALTdata,how.many = 15)
+
+## based on judgement, I've selected these invoices to inquire about.
+REPtransactions[c(1,4,8,13,16,22,28,45,50,56),]
+```
+
+# Conclusion
+Using R I was able to conduct an analysis rooted in science. I think it's important to note that we still had to use professional judgement when it came to analyzing the overall activity in the detail. Clients have different operations but Benford's Law helps establish a standard bar to audit important financial statement accounts.

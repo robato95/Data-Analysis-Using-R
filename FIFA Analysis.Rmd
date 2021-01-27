@@ -1,0 +1,114 @@
+---
+title: "FIFA Analysis"
+author: "Robert Vargas"
+date: "3/29/2020"
+output: html_document
+---
+I obtained the following dataset that contains 100+ attributes for over 18,000 players from FIFA 20. I've used this data to generate general analysis of the data.
+
+## General Considerations
+```{r}
+data<- read.csv(file = "players_20.csv", head = TRUE, sep = ",")
+barplot(table(data$preferred_foot), ylim = c(0,20000), main = "Preferred Foot")
+plot(data$value_eur, data$wage_eur, xaxt='n', yaxt='n' ,xlab = "Market Value of Players (EUR)", ylab = "Wage of Players (EUR)", main = "Relationship of Market Value with Wages")
+```
+
+One of the first questions that came to my mind is what portion of the players are left footed/right footed and what the salaries of these highly valuable players look like. Based on the charts above, a majority of players are right footed. Secondly, it appears that the higher valuable players are also paid more.
+
+Summarizing the geographical composition of the data require manual engineering. Using the "Countrycode" package I was able to classify the continent in which the player is from. Certain countries for some reason were unable to be classified so I manually formatted these values.
+```{r}
+library(countrycode)
+data$region<- countrycode(sourcevar = data$nationality, origin = "country.name", destination = "continent")
+data$region[data$nationality %in% c("Wales","England","Scotland","Northern Ireland","Kosovo")]<- "Europe"
+data$region[data$nationality == "Central African Rep." ]<- "Africa"
+region<- c("Africa", "Americas", "Asia", "Europe", "Oceania")
+ratio<- paste(round(table(data$region)/18278*100,0),"%",sep = "")
+pie(table(data$region), labels = ratio, col = rainbow(length(region)))
+legend("bottomright", legend = region,fill = rainbow(length(region))) 
+```
+
+A majority of the players are of European descent which makes sense given the top 4 four leagues in world are all European. Soccer is huge in countries like Mexico, Brazil, and Argentina which I would think is why the Americas is the 2nd largest portion of descent.
+
+Similar to the geographical analysis, I wanted to explore information regarding the positions of players in the game. It would also require manual engineering of the data. First, I created a column that pulled the specific/preferred position where the player is on the field. Secondly, I created a column that categorizes the players position into the 4 general positions on the field - forward, midfield, defense, and goalkeeper.
+```{r}
+data$position<- NA
+data$position<- substr(data$player_positions,1,3)
+data$position<- gsub(",","",data$position)
+barplot(table(data$position), ylim = c(0,4000), col = c(4), xlab = "Position on the Field", ylab = "No. of Players", las = 2, cex.names = .75)
+
+data$gen_position<- NA
+data$gen_position[data$position %in% c("CF","LF","LS","LW","RF","RS","RW","ST")]<- "FWD"
+data$gen_position[data$position %in% c("CAM","CDM","CM","LAM","LCM","LDM", "LM","RAM","RCM","RDM","RM")]<- "MID"
+data$gen_position[data$position %in% c("CB","LB","LCB","LWB","RB","RCB","RWB")]<- "DEF"
+data$gen_position[data$position == "GK"]<-"GK"
+barplot(table(data$gen_position), ylim = c(0,7000), col = c(4), xlab = "Position on the Field", ylab = "No. of Players")
+```
+
+Most of the players are centerbacks and strikers, which are the most important positions on the field. But when we categorize the positions we find something interesting. Upon further analysis, most of the players play in the midfield position which does not include the CB or ST position. Midfielders arguably influence the game more than any other positions. Given there are so many roles in midfield it does not surprise me that this is the most heavily populated position.
+
+## Further Analysis
+So far my analysis has involved fairly basic metrics. I wanted to create a model that could predict the overall speed of the player based on features such as his height, weight, and athletic attributes. In order to get a basic understanding of all the player's speed metrics I created a histogram. Based on my personal experience with the game I understand that goalkeepers have a null sprint speed attribute, so in order to create an accurate model I will remove all goalkeepers from the dataframe I've created.
+```{r}
+stats<- data.frame( name = data$short_name, height = data$height_cm, weight = data$weight_kg,age = data$age, region = data$region, position = data$gen_position, overall = data$overall, pace = data$pace,physical = data$physic, acceleration = data$movement_acceleration, speed = data$movement_sprint_speed, agility = data$movement_agility, reactions = data$movement_reactions, balance = data$movement_balance, jumping = data$power_jumping,stamina = data$power_stamina ,strength = data$power_strength)
+
+GK<-which(stats$position == "GK")
+stats<- stats[-c(GK),]
+ 
+hist(stats$speed, main = "Player's Speed", xlab = "Speed", ylab = "No. of Players", labels = TRUE, ylim = c(0,3500))
+abline( v = mean(stats$speed), col = "blue", lwd = 2)
+axis(side=1, at = seq(0,100,10))
+```
+
+As we can see the data is distributed normally and a very few players have sprint attributes over 85, which is considered world class. Similarly, a small percentage of players have speed attributes less than 50.
+
+I obviously didn't extract all attributes from the original dataset, I only extracted the items that I thought logically made sense to, excluding anything that is skill related like skills, headers, shot power, etc. I created a dataframe to summarize the correlation between speed and these variables.
+
+```{r}
+data.frame(
+  height = round(cor(stats$height,stats$speed),2) ,
+  weight =round(cor(stats$weight, stats$speed),2),
+  age = round(cor(stats$age, stats$speed),2),
+  pace =round(cor(stats$pace, stats$speed),2),
+  physical =round(cor(stats$physical, stats$speed),2),
+  acceleration = round(cor(stats$acceleration, stats$speed),2),
+  agility=round(cor(stats$agility, stats$speed),2),
+  reactions= round(cor(stats$reactions, stats$speed),2),
+  balance= round(cor(stats$balance, stats$speed),2),
+  jumping= round(cor(stats$jumping, stats$speed),2),
+  stamina= round(cor(stats$stamina, stats$speed),2),
+  strength= round(cor(stats$strength, stats$speed),2))
+```
+
+I decided any variables with a correlation < .20 or > -.20 would not be worth including in my model. So age, physical, jumping, and reactions will not be included in my model. I created the model below and rounded the prediction to the nearest whole number.
+
+```{r}
+library(caTools)
+set.seed(123)
+sample<- sample.split(stats, SplitRatio = .75)
+train<- subset(stats, sample == TRUE)
+test<- subset(stats, sample==FALSE)
+
+model<- lm( speed ~ height + weight + pace + acceleration + agility  + balance  + stamina + strength, data = train)
+test$prediction<- round(predict(model,test),0)
+```
+
+## Evaluating the results
+```{r}
+test$success<- test$prediction - test$speed
+#a successful prediction would be a 0 value
+success<-0
+
+for (result in test$success) {if (result == 0){success<- success+1}}
+
+paste("The model predicted",success,"shoes sizes correctly out of 4777")
+```
+
+The model predicted roughly 53% of the test set successfully. I was expecting a higher percentage but as look further the model was not as inaccurate  as its seems. Since we tracked the number of cases the model correctly predicted a players speed, I ran a summary of the results and the min/max are both 1. This indicates that though our model is off, it will never be off more than 1 whole integer. 
+
+
+```{r}
+summary(test$success)
+summary(model)
+```
+ 
+ As look at the summary of the model, it appears clear that pace and acceleration are the only significant variables in the model. The rest of the variables have p-values that are greater than .05, indicating they're not statistically significant. The model's R-squared is almost 1, which indicates that the model's independent variables explains almost 100% of the values from the dependent variable.Perhaps if we exclude the insignificant variables we will have a higher rate of success.

@@ -1,0 +1,100 @@
+---
+title: "$SPY Returns Distribution"
+author: "Robert Vargas"
+date: "8/17/2020"
+output: html_document
+---
+
+Based on material that I've read from my personal research regarding investing, I decided to test the notion that stock price returns are normally distributed. To test this idea, I've obtained monthly closing prices for $SPY, a SP500 index that was founded on January 22, 1993, from Yahoo Finance. This is roughly 20+ years of data and I will use the mean and standard deviation of monthly returns to investigate whether returns are normally distributed.
+
+```{r, message = FALSE}
+setwd("/Users/robertvargas/Documents/Projects/R/Stock Returns")
+data<- read.csv("SPY.csv", header = TRUE)
+library(quantmod)
+library(e1071)
+```
+
+## Statistical Analysis
+The data contains only closing prices and volume figures. This leaves me with the task of manually calculating monthly returns. In addition, I've saved the mean and standard deviation as variables to use later.
+
+```{r}
+n<- nrow(data)
+data$return<- 0
+
+for (i in 2:n)
+  {data$return[i]<- (data$Close[i] - data$Close[i-1])/data$Close[i-1]*100}
+
+data$return<- round(data$return, digits = 2)
+MEAN<- mean(data$return)
+SD<- sd(data$return)
+```
+
+The average return and standard deviation of these returns are as follows. In addition, we see that monthly returns range between a loss of approx. 17% and a 13% gain. Given the mean, I expect the average annual return would be 8% (see below).
+
+```{r, echo = FALSE}
+paste("The average monthly return is ",MEAN)
+paste("The standard deviation for the monthly returns is ",SD)
+paste("The max. (+) and min.(-) value is ", range(data$return))
+```
+```{r}
+MEAN * 12
+histo<- hist(data$return,breaks = 25, col = "blue", main = "$SPY (SP500 Index)", xlab = "Monthly Returns", ylim= c(0,55), xaxt = 'n', xlim = c(-20,20))
+axis(side =1 , at = seq(-20,20, by = 5))
+abline(v= MEAN, col = "red", lwd =2)
+skewness(data$return)
+```
+
+The data is negatively skewed so the returns slightly lean to the right, which means that we are more likely to see a positive return in general. I will discuss this later.
+
+## Visuals
+Given the range of the returns, I decided to construct my probability plot using such figures below.
+
+```{r}
+x<- seq(from =-20, to =20, by = 1)
+y<- dnorm(x, mean = MEAN, sd = SD)
+
+plot(histo$mids, histo$density, type = "h", lwd = 4, col = "red", xaxt = 'n', xlab = "Monthly Returns"
+     ,ylab = "Probability Density Function", main = "$SPY Monthly Returns", xlim = c(-20,20))
+axis(side = 1, at = seq(-20, 20, 5) )
+grid(col = "black")
+lines(x,y, col = "blue", lwd = 4)
+```
+
+It appears that most of the returns fall within the distribution curve. Another measure we can use to verify its behavior is by plotting its values using a Q-Q plot. When we plot the values against the Q-Q plot we see that there a few outliers that appear to not follow the 45-degree angle line. Deviations from this blue line represent differences from the normal distribution.
+
+```{r}
+qqnorm(data$return, col = "red", lwd = 2)
+qqline(data$return, col = "blue", lwd = 2)
+grid(col = "black")
+
+```
+
+The data shows a departure from normal in the tails. The data may be slightly non-normal but is normal enough to provide a deeper analysis. With large samples, in this case 332, any slight deviation can be significant. Visually the data appears to be "normal" enough for us to draw further conclusions.
+
+## Probabilities
+By looking at the graphs we see that though, highly unlikely, investing in this index can you land a monthly return higher than 10%. Evenly unlikely, you could experience a monthly loss greater than 10% as well, but how likely are these returns? 
+
+```{r}
+a<-round((1 - pnorm(10, mean = MEAN, sd = SD))*100,2)
+b<- round(pnorm(-10, mean = MEAN, sd = SD)*100,2)
+```
+```{r, echo = FALSE}
+paste("The probability of achieving a monthly return greater than 10% is", a, "%.")
+paste("The probability of achieving a monthly loss greater than 10% is ", b, "%.")
+
+```
+
+It's very unlikely that we would obtain such a dramatic gain/loss on a monthly basis. Like I noted earlier, the distribution of returns are slightly skewed towards positive % returns. To illustrate I plotted the Cumulative Distribution Function (CDF).
+
+```{r}
+y<- pnorm(x, mean = MEAN, sd = SD)
+
+plot(x,y, type = "l", col = "red", lwd = 2, xlab = "Monthly Return", ylab = "Probability", main = "Cumulative Distribution Function")
+grid (col = "black")
+
+```
+
+The CDF illustrates the probability of obtaining a value smaller than a random given value, in this case monthly returns. As given by the graph, there is a 40% of obtaining a monthly loss.
+
+## Conclusion
+We've analyzed the average monthly return in $SPY. There is a bout a 30% spread in terms of returns and we calculated that the average return is around .7%, which is rougly a 8% annual. Furthermore, there is approx. a 60% chance that your monthly return will be a positive one. I'd include $SPY in my portfolio.

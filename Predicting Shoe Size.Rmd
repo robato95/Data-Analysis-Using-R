@@ -1,0 +1,53 @@
+---
+title: "Predicting Shoe Sizes"
+author: "Robert Vargas"
+date: "2/1/2020"
+output: html_document
+---
+
+
+The following data was uploaded by Sebastian Sauer at https://osf.io/ja9dw/. The website doesn't go into too much detail about how the data was collected but the data summarizes the heights and shoe size of an undergraduate class in Germany. As you will see most of the observations (101 total) recorded measurements of women so my model will be used to predict female shoe sizes.
+```{r}
+library(broom)
+setwd("/Users/robertvargas/Documents/Projects/R/Prediction Project")
+data<- read.csv("wo_men.csv")
+summary(data)
+```
+After reviewing the dataset summary, invalid values exist in the data. We have an "N/A" value in the sex column and unreasonable measurements in the height column. I removed the row with the "N/A" value and manually updated the rows with measurement errors.
+
+```{r}
+data<- data[-c(which(is.na(data$sex))),]
+data[which(data$height < 140),]
+data$height[c(48,62,78,81)]<- c(184,163,168,173)
+data<- data[-c(which(data$shoe_size > 40)),]
+##Now we save the data we need to create the model
+population<- data[which(data$sex == "woman"),]
+
+```
+
+## Creating the Model
+So now that we have the data needed for the model, I decided to use 10 observations as my test to evaluate my model. The remaining data will be used to create the model. The observations are chosen at random.
+
+```{r}
+count<-sample(1:nrow(population),10, replace = FALSE)
+train<- population[-c(count),]
+test<- population[c(count),]
+model<- lm(shoe_size ~ height, data = train)
+test$predictions<-round(predict(model,test), digits = 0)
+```
+
+## Evaluating the Results
+Using the model I've creatd, I predicted the shoe sizes of 10 test observations. I rounded the predictions to the nearest whole number since the shoe sizes aren't going to exactly tie to a whole number.
+```{r}
+test$result<- test$predictions - test$shoe_size
+success<- 10
+for (result in test$result) {if (result != 0){success<-success-1}}
+paste("The model predicted",success,"shoes sizes correctly out of 10")
+```
+So my model was very inaccurate. Given that we made the model solely based on height, perhaps more variables affect a person's shoe size. In order to understand the correlation between height and one's shoes size, we evaluated certain measures of the model. 
+```{r}
+##Extracting r-squared and the model's p-value.
+glance(model)[,c(1,5)]
+```
+
+A p-value helps identify if the null hypothesis that the correlation between height and shoe sizes is valid. Since the p-value is significantly less than .05 we can reject the hypothesis that there is no correlation. Though the model does not explain most of the data (r-squared), you can conclude there is dependence on height.

@@ -1,0 +1,64 @@
+---
+title: "Tesing Benford's Law"
+author: "Robert Vargas"
+date: "8/3/2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction - UPDATE
+Benford's Law is an observation about the leading digits of the numbers found in real-world data sets. Instead of the leading digits of such numbers being uniformly distributed, they follow a frequency predicted by using base-10 logarithms which decrease as the digits increase from 1 to 9. It can be displayed as:
+```{r}
+## x will be digits 1 that we will later insert.
+BenLaw<- function(x) {log10(1+1/x)}
+
+barplot(BenLaw(c(1:9)), ylim = c(0,.35))
+```
+
+This chart displays the basic frequencies of leading digits as described by Benfords Law. In R we can analyze data and plot it against the frequencies to determine if it follows Benford's Law.
+
+
+## Data
+The dataset we will be analyzing will one provided from <i>data.gov</i>. This dataset contains the counts of the actual number of vehicles passing through a given location on an average weekday in Chicago. A citywide count is taken every 10 years and these counts range from February 2006 to June 2007. Let's download and it save to variable trafficdata. Let's see what type of data we're working with.
+```{r}
+trafficdata<- read.csv("https://data.cityofchicago.org/api/views/pfsx-4n4m/rows.csv?accessType=DOWNLOAD")
+
+typeof(trafficdata)
+colnames(trafficdata)
+```
+We are going to be concerned with the "Total Passing Vol".
+```{r}
+head(trafficdata[,c(1,3,4,5)],10)
+```
+First let's make a function that can pick out the first digit of the character representation of a number.
+```{r}
+leadingnumber<- function(x) substr(gsub('[0.]', '', x), 1, 1)
+## Now we will create a function that counts the absolute requencies of each first digit, we will store that in a data frame.
+freq <- function(x) data.frame(table(leadingnumber(x)) / length(x))
+## Testing the functions
+leadingnumber(c(1:20))
+freq(trafficdata[,5])
+Population<- freq(trafficdata[,5])
+```
+
+```{r}
+barplot(Population[,2], ylim = c(0,.50)) + lines(x = BenLaw(1:9), lwd = 4)
+```
+As we can, see the data loosely resembles the frequencies stated by Benford's Law. We note that digits 1 and 2 appear more frequently than the default, while digits 4-7 do not appear as much as the law states.
+
+
+
+R contains a package that contains the benford() function. This function provides tools that make it easier to validate data using Benford's Law, we will use to further our analysis of the traffic data.
+```{r}
+library(benford.analysis)
+benford(trafficdata[,5], number.of.digits = 1)
+
+plot(benford(trafficdata[,5], number.of.digits = 1))
+```
+
+As we can see there is a clear discrepancy when it comes to numbers 1,2,5,4, and 6.

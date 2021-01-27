@@ -1,0 +1,81 @@
+---
+title: "Econometric Analysis - Credit Card Data"
+author: "Robert Vargas"
+date: "6/7/2020"
+output: html_document
+---
+Data: https://www.kaggle.com/dansbecker/aer-credit-card-data
+
+The following dataset was obtained from Kaggle and is originally published as part of the book "Econmetric Analysis" by William Greene. The data is collected from a lending institution and indicates whether a cardholder's application got accepted (1) or denied (0). Using this data, I will use a logistic regression model to predict whether cardholders in a test sample got approved.
+```{r, echo = FALSE}
+setwd("/Users/robertvargas/Documents/Projects/R/Credit Card Project")
+data<- read.csv("AER_credit_card_data.csv")
+
+```
+
+```{r}
+library(corrplot)
+summary(data)
+str(data)
+dim(data)
+```
+I note that the dataset has 12 variables including the approval variable ("card"). Approximately 23% of total cardholders were denied a credit card. Variables such as age, income, and dependents have a large range. The data set is a mix of integers, factor, and numerical values. See a summary of the content below.
+
+* card: Dummy variable, 1 if application for credit card accepted, 0 if not
+* reports: Number of major derogatory reports
+* age: Age n years plus twelfths of a year
+* income: Yearly income (divided by 10,000)
+* share: Ratio of monthly credit card expenditure to yearly income
+* expenditure: Average monthly credit card expenditure
+* owner: 1 if owns their home, 0 if rent
+* selfempl: 1 if self employed, 0 if not.
+* dependents: 1 + number of dependents
+* months: Months living at current address
+* majorcards: Number of major credit cards held
+*active: Number of active credit accounts
+
+## Feature Engineering
+In order to create the predictive model, we need our variables to be in a numeric format. To do this I needed to format the data accordingly using a series of loops.
+```{r}
+data[,1:12]<- sapply(data[,1:12], as.character)
+n<- nrow(data)
+##To turn quantitive data into qualitive data
+for (i in 1:n)
+{if (data$card[i] == "yes"){data$card[i]<- 1} else {data$card[i]<- 0}}
+for (i in 1:n)
+{if (data$owner[i] == "yes"){data$owner[i]<- 1} else {data$owner[i]<- 0}}
+for (i in 1:n)
+{if (data$selfemp[i] == "yes"){data$selfemp[i]<- 1} else {data$selfemp[i]<- 0}}
+data[,1:12]<- sapply(data[,1:12], as.numeric)
+
+```
+
+## Building the Model
+Now that the data is in the appropriate format, I decided to create a train and test model based on a 80/20 ratio. I will use the rule of 10 in order to keep the risk of overfitting low. To handpick the 10 variables included in the model I created a correlation plot. 
+```{r}
+sample<-sample(1:n,n*.20)
+test<- data[sample,]
+train<- data[-sample,]
+
+corrplot(cor(train), method = "circle")
+model<-glm(card ~ reports + income + owner + selfemp + dependents + majorcards + active,family = binomial,data = train)
+
+summary(model)
+```
+Age has the smallest correlation compared to the others. I decided to omit "share" and "expenditures" because the correlation is too high and prevents me from creating an accurate model (fitted probabilities). Essentially all of the variables within the model are statistically significant.
+
+```{r}
+test$app<- NA
+test$app<- predict(model, test, type = "response" )
+test$app<- ifelse(test$app > .5, 1, 0)
+accuracy<- table(test$card, test$app)
+accuracy
+sum(diag(accuracy))/sum(accuracy)
+```
+## Conclusion
+The model appears to predict approved cardholders with high accuracy. Though the accuracy of the model is acceptable (high 80s), our largest variances appear to be predicting rejected applicants. This could be due to the fact that our model was based on a dataset that was heavily disproportionate and had signficantly more acceptances than rejections.
+
+```{r}
+prop.table(table(train$card))
+```
+

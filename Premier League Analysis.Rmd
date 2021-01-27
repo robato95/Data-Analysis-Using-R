@@ -1,0 +1,248 @@
+---
+title: "Premier League Analysis"
+author: "Robert Vargas"
+date: "7/10/2020"
+output: html_document
+---
+
+## Introduction
+
+This dataset was provided via Kaggle (https://www.kaggle.com/dortmund4436/premier-league-player-stats-from-2015-to-2018) and was sourced from various websites to pull all the information within the dataset. The dataset includes information for seasons between 2015-16 through 2018-19 but does not include goalkeeper information or players with less than 10 appearances in a season. In addition to the dataset I have created a separate dataframe for each season. Given that I follow the Premier League and a huge soccer fan, I will create expectations using my own personal knowledge of the game.
+
+```{r}
+setwd("/Users/robertvargas/Documents/Projects/R/Premier League")
+data<- read.csv("Final Premier League Data.csv")
+library(formattable)
+data$ggratio<- round((data$Goals/data$App)*100,0)
+##used for an analysis related to forwards
+season16<-data[which(data$Season =="2015-2016"),]
+season17<-data[which(data$Season =="2016-2017"),]
+season18<-data[which(data$Season =="2017-2018"),]
+season19<-data[which(data$Season =="2018-2019"),]
+colnames(data)
+```
+
+## General Demographics 
+I wanted to explore the demographic make-up of the top players in the league. I explored the racial composition and the age distribution of the league. The Premier League is the most popular league in football, attracting players from all over the world. Even though the league is based out of the UK, I would expect most the players to be of foreign descent. In addition, professional players usually hit their prime around 26 and retire by 35. Generally, it is rare to see players over 35 playing consistently ever week as a starter, let alone someone who is a teenager and new to the league. Therefore, I'd expect the age histogram to resemble a normal distribution
+
+
+```{r}
+data$foreign<- NA
+data$foreign[data$Nation %in% c("England")]<- "British"
+data$foreign[!data$Nation %in% c("England")]<- "Foreign"
+```
+
+```{r, echo = FALSE}
+par(mfrow = c(2,2))
+x<-table(data$foreign[data$Season =="2015-2016"])
+pie(table(data$foreign[data$Season =="2015-2016"]), labels = round(x/sum(x),2), main = "2015-2016 Season", col = c(84,2))
+x<-table(data$foreign[data$Season =="2016-2017"])
+pie(table(data$foreign[data$Season =="2016-2017"]), labels = round(x/sum(x),2), main = "2016-2017 Season", col = c(84,2))
+x<-table(data$foreign[data$Season =="2017-2018"])
+pie(table(data$foreign[data$Season =="2017-2018"]), labels = round(x/sum(x),2), main = "2017-2018 Season", col = c(84,2))
+x<-table(data$foreign[data$Season =="2018-2019"])
+pie(table(data$foreign[data$Season =="2018-2019"]), labels = round(x/sum(x),2), main = "2018-2019 Season", col = c(84,2))
+legend("bottomright", legend = c("British", "Foreign"), cex = .8, fill = c(84,2))
+
+par(mfrow = c(2,2))
+hist(season16$Age, ylim = c(0,85), xlim = c(15,40), main = "Histogram of Player Ages", xlab = "2015-2016 Season", col = "red")
+abline( v= mean(season16$Age), col = "blue", lwd =2)
+hist(season17$Age, ylim = c(0,85), xlim = c(15,40), main = "",xlab = "2016-2017 Season", col = "red")
+abline( v= mean(season17$Age), col = "blue", lwd =2)
+hist(season18$Age, ylim = c(0,85), xlim = c(15,40), main = "",xlab = "2017-2018 Season", col = "red")
+abline( v= mean(season18$Age), col = "blue", lwd =2)
+hist(season19$Age, ylim = c(0,85), xlim = c(15,40), main = "",xlab = "2018-2019 Season", col = "red")
+abline( v= mean(season19$Age), col = "blue", lwd =2)
+```
+
+```{r}
+aggregate(data$Age, by = list(data$Season), FUN = mean)
+```
+
+As expected approximately 70% of the league are not originally from the UK.I addition the median age of total players is between 25 and 26 years old. We see this is consistent across the 4 seasons, so that must mean that teams are always bringing in new talent to reinforce the teams.
+
+## Market Values
+Footballers are some of the most expensive players in the world. Players from the best teams are generally more expensive than other players for underperforming teams. As such, I would expect the market value data for the league to be right skewed. I also will plot the average market value for each position during each season and see what that data tells us.
+
+First let's take a look at the market values of the last 4 champions.
+```{r}
+chelsea<- data[which(data$Squad =="Chelsea"),]
+mancity<- data[which(data$Squad =="Manchester City"),]
+leicester<-data[which(data$Squad =="Leicester City"),]
+comma(sum(leicester$Previous.Market.Value[leicester$Season == "2015-2016"]), digits =0)
+comma(sum(chelsea$Previous.Market.Value[chelsea$Season == "2016-2017"]), digits = 0)
+comma(sum(mancity$Previous.Market.Value[mancity$Season == "2017-2018"]), digits = 0)
+comma(sum(mancity$Previous.Market.Value[mancity$Season == "2018-2019"]), digits = 0)
+
+aggregate(data$Previous.Market.Value, by = list(data$Squad), FUN = mean)
+```
+We see that Leicester City had a £135MM team when they won the Premier League. After the seasons 2015-16 the total value of winning squads significantly increased, almost doubling by the 2017-18 season. As we average out the squads over the last four seasons, we see that the "Top Four" and Manchester City have significantly higher valued teams compared to the rest of the league. This should be no surprise given the successful history of these teams and the big named transfers that occur every season. Now let's plot the histogram of player's market value.
+
+```{r, echo = FALSE}
+par(mfrow = c(2,2))
+data$Previous.Market.Value<- data$Previous.Market.Value/100000
+x<- mean(data$Previous.Market.Value)
+hist(data$Previous.Market.Value[data$Season =="2015-2016"], ylim = c(0,250),breaks = 12, main = "MV of Players in £100k increments", xlab = "2015-2016 Season", col = "blue")
+hist(data$Previous.Market.Value[data$Season =="2016-2017"], ylim = c(0,250),breaks = 12, main = "",xlab = "2016-2017 Season", col = "blue")
+hist(data$Previous.Market.Value[data$Season =="2017-2018"], ylim = c(0,250),breaks = 12, main = "", xlab = "2017-2018 Season", col = "blue")
+hist(data$Previous.Market.Value[data$Season =="2018-2019"], ylim = c(0,250),breaks = 12, main = "", xlab = "2018-2019 Season", col = "blue")
+```
+
+As expected, the market values are right skewed. This is due to the fact that the high performing teams usually have more money to spend during the transfer season and due to their history of successful campaigns, players are valued higher. As we see below the average market value for defenders (DF) and forwards (FW) steadily increased through the years. For some reason the average value of midfielders (MF) drastically dropped in the 2018-19 season. It is clear that forwards are usually valued higher than others.
+
+```{r,echo= FALSE}
+season16<-data[which(data$Season =="2015-2016"),]
+season17<-data[which(data$Season =="2016-2017"),]
+season18<-data[which(data$Season =="2017-2018"),]
+season19<-data[which(data$Season =="2018-2019"),]
+averagevalue16<- aggregate(season16$Previous.Market.Value, by = list(season16$Position), FUN = mean)
+averagevalue17<- aggregate(season17$Previous.Market.Value, by = list(season17$Position), FUN = mean)
+averagevalue18<- aggregate(season18$Previous.Market.Value, by = list(season18$Position), FUN = mean)
+averagevalue19<- aggregate(season19$Previous.Market.Value, by = list(season19$Position), FUN = mean)
+df.list <- list(averagevalue16,averagevalue17,averagevalue18,averagevalue19)
+
+```
+
+```{r}
+DF<- NULL
+MF<- NULL
+FW<- NULL
+for (x in df.list)
+  + {DF<- rbind(DF, x[1,2])}
+for (x in df.list)
+  + {MF<- rbind(MF, x[3,2])}
+for (x in df.list)
+  + {FW<- rbind(FW, x[2,2])}
+```
+
+```{r, echo = FALSE}
+par(mfrow = c(3,1))
+x<- c("15-16", "16-17", "17-18", "18-19")
+plot(DF, xaxt = 'n', main = "DF Players (£)", col = "yellow", pch = 19)
+axis(1, at = seq(1,4, by =1),labels = x)
+text(DF,labels = round(DF,0), pos = 2)
+plot(MF, xaxt = 'n', main = "MF Players (£)", col = "green", pch = 19)
+text(MF, labels = round(MF,0), pos =2)
+axis(1, at = seq(1,4, by =1),labels = x)
+plot(FW, xaxt = 'n', main = "FW Players (£)", col = "blue", pch = 19)
+axis(1, at = seq(1,4, by =1),labels = x)
+text(FW, labels = round(FW,0), pos =2)
+```
+
+## Analyzing Player Stats
+I then analyzed key stats that are important to players in each position. Players from each position are judged on different metrics such as tackles, passes, goals, etc. We will take a look at some key stats and see which players appear to stand out.
+
+## Forwards 
+Forwards are typically judged on the amount of goals they score. Judging by the distribution of goals scored, we see that the data is heavily skewed to the right. It might be unfair to judge forwards solely on goal figures since certain forwards play more games than others. A popular metric to judge a forward's efficiency in front of goal is the goal to game ratio.
+
+```{r, echo = FALSE}
+par(mfrow = c(1,1))
+hist(season16$Goals[season16$Position =="FW"], breaks = 10, main = "Distribution of Total Goals Scored", xlab = "2015-2016 Season", col = "blue", ylim = c(0,50))
+
+par(mfrow = c(2,2))
+hist(season16$ggratio[season16$Position =="FW"], breaks = 8, xlab = "2015 - 2016 Season", main = "Goal to Game Ratio", col = "blue")
+hist(season17$ggratio[season17$Position =="FW"], breaks = 8, xlab = "2016 - 2017 Season", main = "", col = "blue")
+hist(season18$ggratio[season18$Position =="FW"], breaks = 8, xlab = "2017 - 2018 Season", main = "", col = "blue")
+hist(season19$ggratio[season19$Position =="FW"], breaks = 8, xlab = "2018 - 2019 Season", main = "", col = "blue")
+```
+
+```{r}
+forwards<- data.frame(matrix(ncol = 0, nrow = 0))
+for ( i in 1:nrow(data))
+{ if ( data$ggratio[i] >=80) print(data$Player[i]) }
+
+```
+
+
+After reviewing the histograms, it appears that the max ratio in the league tends to fall under 80%. During the 2016-2017 and 2017-2018 there were players who hit an average greater than 80%. We see that these players (3) have been consistently hit this mark during the past seasons.
+## Midfielders
+The number of midfielder's assists carry the same weight as goals. By using the 2015-16 season as a preliminary analysis, we see that the data is extremely right-skewed. Perhaps it would make sense to judge midfielders based on the number of passes they complete. I would still expect the data to be skewed to the right but not as much compared to analyzing assists.
+```{r, echo = FALSE}
+par(mfrow = c(1,1))
+hist(season16$Assists[season16$Position =="MF"], breaks = 10,main = "Distribution of Total Assists", xlab = "2015-2016 Season", col = "green")
+par(mfrow = c(2,2))
+hist(season16$Passes[season16$Position =="MF"], breaks = 7, ylim = c(0,55), main = "Total Passes by MF Players", xlab = "2015-2016", col = "green")
+hist(season17$Passes[season17$Position =="MF"], breaks = 7, ylim = c(0,55), main = "",xlab = "2016-2017", col = "green")
+hist(season18$Passes[season18$Position =="MF"], breaks = 10, ylim = c(0,55), main = "",xlab = "2017-2018", col = "green")
+hist(season19$Passes[season19$Position =="MF"], breaks = 10, ylim = c(0,55), main = "", xlab = "2018-2019", col = "green")
+```
+```{r}
+midfielders<- which(season18$Passes >3000)
+season18$Player[midfielders]
+midfielders<- which(season19$Passes >3000)
+season19$Player[midfielders]
+```
+
+We see that during the 2015-2016 and 2016-2017 seasons, the data was distributed a bit more evenly compared to the 2017-18 and 2018-19 season. During the 2017-18 and 2018-19, there were midfielders who completed more than 3,000 passes. Noticed as we extracted players with more than 3,000 passes a couple defenders appear in our result. So it appears that even defensive players can put up passing figures similar to midfielders.
+
+## Defenders
+Defenders are typically judged on total number of interceptions, tackles, and clearances they make. I will analyze tackles and interceptions. Given that tackles and interceptions occur more frequently than goals or assists, I would expect the distribution of these stasts to resemble a uniform distribution.
+```{r, echo = FALSE}
+par(mfrow = c(2,2))
+hist(season16$Tackles[season16$Position =="DF"], breaks = 5, ylim = c(0,60), main = "Total Tackles by DF Players", xlab = "2015-2016", col = "yellow")
+hist(season17$Tackles[season17$Position =="DF"], breaks = 5, ylim = c(0,60),main = "", xlab = "2016-2017", col = "yellow")
+hist(season18$Tackles[season18$Position =="DF"], breaks = 5, ylim = c(0,60), main = "", xlab = "2017-2018", col = "yellow")
+hist(season19$Tackles[season19$Position =="DF"], breaks = 5, ylim = c(0,60), main = "", xlab = "2018-2019", col = "yellow")
+
+```
+
+```{r}
+defenders<- which(season18$Tackles >120)
+season18$Player[defenders]
+defenders<- which(season19$Tackles >120)
+season19$Player[defenders]
+```
+
+
+
+```{r, echo = FALSE}
+par(mfrow = c(2,2))
+hist(season16$Interceptions[season16$Position =="DF"], breaks = 10, ylim = c(0,60), main = "Total Interceptions by DF Players", xlab = "2015-2016", col = "yellow")
+hist(season17$Interceptions[season17$Position =="DF"], breaks = 10, ylim = c(0,60),main = "", xlab = "2016-2017", col = "yellow")
+hist(season18$Interceptions[season18$Position =="DF"], breaks = 10, ylim = c(0,60), main = "", xlab = "2017-2018", col = "yellow")
+hist(season19$Interceptions[season19$Position =="DF"], breaks = 10, ylim = c(0,60), main = "", xlab = "2018-2019", col = "yellow")
+```
+
+```{r}
+defender<- which(season16$Interceptions >120)
+season16$Player[defender]
+```
+
+
+The data related to tackles appears to be right skewed at a larger rate compared to data related to interceptions. Wilfred Ndidi consistently impressed during the 2017-18 and 2018-19 season, ranking up a large number of tackles. Interceptions appear to be distributed at a even rate but it is still apparent that most players will struggle to complete more than 80 interceptions during the season. Idriss Gueye (DF) was not that the only player to complete more than 120 interceptions, N'Golo Kante (MF) also completed this feat.
+
+## General Stats
+Now that we've analyzed the different metrics used to judge players. Let's extract the most important players from the last 4 seasons. 
+```{r}
+##top goal scorer
+stats<- aggregate(data$Goals, by = list(data$Season), FUN = max)
+season1516<- as.character(season16$Player[which.max(season16$Goals)])
+season1617<- as.character(season17$Player[which.max(season17$Goals)])
+season1718<- as.character(season18$Player[which.max(season18$Goals)])
+season1819<- as.character(season19$Player[which.max(season19$Goals)])
+x<- rbind(season1516, season1617,season1718,season1819)
+stats<- cbind(stats,x)
+##top assister
+stats<- cbind(stats,aggregate(data$Assists, by = list(data$Season), FUN = max))
+season1516<- as.character(season16$Player[which.max(season16$Assists)])
+season1617<- as.character(season17$Player[which.max(season17$Assists)])
+season1718<- as.character(season18$Player[which.max(season18$Assists)])
+season1819<- as.character(season19$Player[which.max(season19$Assists)])
+x<- rbind(season1516,season1617,season1718,season1819)
+stats<- cbind(stats,x)
+##MVP
+stats<- cbind(stats,aggregate(data$Market.Value, by = list(data$Season), FUN = max))
+season1516<- as.character(season16$Player[which.max(season16$Market.Value)])
+season1617<- as.character(season17$Player[which.max(season17$Market.Value)])
+season1718<- as.character(season18$Player[which.max(season18$Market.Value)])
+season1819<- as.character(season19$Player[which.max(season19$Market.Value)])
+x<- rbind(season1516,season1617,season1718,season1819)
+stats<- cbind(stats,x)
+
+stats<-stats[-c(1,4,7,10)]
+colnames(stats)<- c("Most Goals", "Player", "Most Assists", "Player", "MVP", "Player")
+stats
+```
+It appears Harry Kane and Mohamed Salah have been going head to head in the goal charts. Despite this, neither have won the league. Mesut Ozil had an impressive run in 2015-16 with 19 assists. As far as the MVP of the league, N'Golo Kante was the league's most valuable player after winning the league in 2015-16, but his value was overtaken by Kevin De Bruyne and Mohamed Salah in the following seasons. 
+
+

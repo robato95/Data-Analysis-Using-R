@@ -1,0 +1,139 @@
+---
+title: "Housing Analysis"
+author: "Robert Vargas"
+date: "5/20/2020"
+output: html_document
+
+---
+
+I obtained the following housing data from Kaggle via the following link:
+https://www.kaggle.com/camnugent/california-housing-prices.
+The data contains information from the 1990 California census and pertains to the houses found in a given California district (based on lat/long coordinates) and key summary stats about them based on the census. Using the data we can answer the following questions:
+
+1. How were housing prices distributed in California during the 1990s?
+2. Which variables appear to affect the median house value of a given district?
+3. Can we create a model to predict prices of a given district?
+
+After minor reformatting to rid the dataset of NA values, the data is ready to be explored. In order to create and test a predictive model, I extracted a sample of 500 districts to use as our test object. The remaining information is used to create the model to predict the median house value in a given district.
+
+```{r, echo = FALSE}
+setwd("/Users/robertvargas/Documents/Projects/R/California Housing Project")
+housing<- read.csv("housing.csv")
+library(readxl)
+library(e1071)
+library(scales)
+```
+
+```{r, echo = FALSE}
+colnames(housing)
+summary(housing)
+housing$total_bedrooms[is.na(housing$total_bedrooms)]<- 0
+sample<- sample(1:20640,500, replace = FALSE)
+test<- housing[sample,]
+housing<- housing[-sample,]
+
+```
+
+## Exploring House Values
+```{r, echo = FALSE}
+hist(housing$median_house_value, xlim = c(0,600000), ylim = c(0,5000), xaxt = 'n', yaxt = 'n', main = "Histogram of 1990 California House Prices", xlab = "House Prices", ylab = "Frequency", col = "blue")
+axis(side =1, at = seq(0,600000,50000))
+axis(side =2, at = seq(0,5000,500))
+
+cat("Measure of skewness:", skewness(housing$median_house_value))
+cat("The average house value:", mean(housing$median_house_value))
+```
+
+Once we graph the prices into a histogram we see that the data is rightly skewed. The average house price is approximately $200k. It is interesting to see that a good number of districts with median values that are over $500k.
+
+In order to summarize the age of households in a given district, I used the following loop to categorize the data. A large number of houses appear to be 11- 40 years old but most houses are between 31-40 years old. Are older houses worth more or less than the others? Are newer houses typically worth more than older ones or are they worth less?
+
+```{r}
+n<- nrow(housing)
+housing$agebracket<- NA
+for (i in 1:n)
+{if (housing$housing_median_age[i]<= 10){housing$agebracket[i]<- "<10"} else if (housing$housing_median_age[i] <= 20){housing$agebracket[i]<- "11-20"} else if (housing$housing_median_age[i]<= 30){housing$agebracket[i]<-"21-30"} else if(housing$housing_median_age[i] <= 40){housing$agebracket[i]<- "31-40"} else if (housing$housing_median_age[i]<=50){housing$agebracket[i]<- "41-50"} else { housing$agebracket[i]<- "Over 50"}}
+
+```
+
+```{r, echo = FALSE}
+barplot(table(housing$agebracket), ylim = c(0,6000), yaxt = 'n', main = "Median Age of Houses (Years)", col = "blue")
+axis(side = 2, at = seq(0,6000,500))
+```
+
+As we see below, districts with an median age over 50 years old are on average worth more than districts with newer homes. As the bucket moves down to 50 years old or less, we do not see a large fluctuation in the average price of homes in these districts. This is an interesting finding considering the most expensive houses are also the oldest.
+
+```{r, echo = FALSE}
+x<- aggregate(housing$median_house_value, by = list(housing$agebracket), FUN = mean)
+colnames(x)<- c("Age Bracket", "Average House Value")
+x
+```
+
+Given that I am from California, I would expect a districts location and its distance from the beach to be a huge factor in determining its price. As summarized below most districts contain homes that are inland and not close to the beach (less than hour away). Less than 25% of districts contain homes that are near the bay/ocean and even smaller percentage of homes are considered built on an island. I would expect the most homes to be in districts located on islands and/or located by the beach or bay.
+
+```{r, echo = FALSE}
+x<-percent(data.matrix(round(prop.table(table(housing$ocean_proximity)),2)))
+y<- c("<1H","Inland", "Island","By Bay","By Ocean")
+pie(table(housing$ocean_proximity), labels = x, main = "Proximity to Ocean", col = rainbow(length(x)))
+legend("topright",y, cex = .8, fill = rainbow(length(x)))
+
+```
+
+As expected the most expensive houses on average are located on islands. The least expensive home are indeed inland. What's surprising is that houses near the beach or bay are not significantly more expensive than those that are less than hour away.
+
+```{r, echo = FALSE}
+x<- as.data.frame(aggregate(housing$median_house_value, by = list(housing$ocean_proximity), FUN = mean))
+barplot(x$x, names.arg = c("<1H", "Inland", "Island", "By Bay", "By Ocean"),xlim = c(0,400000), xaxt = 'n', horiz = TRUE, col = rainbow(nrow(x)), main = "Average Price of Homes Based on Ocean Proximity")
+axis(side =1, at = seq(0,400000,50000))
+
+```
+
+Other important key factors used to justify the price of house involve the city's population, average income for homeowners surrounding the area, etc. Using the median price in a given district, I ran a loop to categorize and understand these influencing factors.
+
+```{r}
+n<- nrow(housing)
+housing$valuebracket<- NA
+for (i in 1:n)
+{if (housing$median_house_value[i]<= 119600){housing$valuebracket[i]<- "25%"} else if (housing$median_house_value[i] <= 179700){housing$valuebracket[i]<- "50%"} else if (housing$median_house_value[i]<= 264725){housing$valuebracket[i]<-"75%"} else {housing$valuebracket[i]<- "Top 25%"} }
+quantile(housing$median_house_value)
+
+```
+
+```{r, echo = FALSE}
+x<-aggregate(housing$median_income, by = list(housing$valuebracket), FUN = mean)
+y<-aggregate(housing$population, by = list(housing$valuebracket), FUN = mean)
+z<-aggregate(housing$households, by = list(housing$valuebracket), FUN = mean)
+agg<-cbind(x,y$x, z$x)
+colnames(agg)<- c("Quantile", "Avg. Income", "Avg. Population", "Avg. Households")
+agg
+
+```
+
+Using the table above, we see that generally the more expensive houses are in districts where the median income is significantly higher than the bucket below. Another noteable item is that the top and low 25% of the spectrum have the smaller populations and a lower amount of surrounding households.
+
+## Model
+```{r}
+model<- lm(median_house_value ~ longitude + latitude + housing_median_age + total_rooms + total_bedrooms + population + households + median_income + ocean_proximity, data = housing)
+summary(model)
+
+test$prediction<- NA
+test$diff<- NA
+test$prediction<- predict(model, test)
+test$diff<- test$prediction - test$median_house_value
+
+```
+
+I included all of the variables in the linear regression model because all variables are statistically significant at the .05 level. Using the model, I predicted the prices of the households of the 500 test subjects mentioned earlier and plotted the differences below.
+
+```{r, echo = FALSE}
+hist(test$diff, main = "Histogram of Prediction Errors" ,xaxt = 'n',xlim = c(min(test$diff),max(test$diff)), ylim = c(0,200), xlab = "Differences in $", col = "red")
+axis(side =1, at = seq(-400000,400000,50000))
+```
+
+On average my predictions were off by $50k. My model's R-squared is in the .60s which indicates that the model explains most of the variations but is not the most accurate. I was expecting to create model with a R-squared figure in the .70s but after reviewing the histogram above, there are notable differences well into the $250k levels. I ran a correlation between the actual and predicted values, calculating a correlation in the 80%s. This implies that our actual and predicted values move in similar directional movement.
+```{r, echo = FALSE}
+x<- data.frame(cbind(actual = test$median_house_value, predicted = test$prediction))
+cor(x)
+```
+
+ 
