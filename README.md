@@ -1,6 +1,7 @@
 # Data-Analysis-Using-R
 
 ## [Rpubs portfolio link](https://rpubs.com/Robato_95)
+Compilation of data science related projects related to finance, human anomalies, sports, and naturally occurring events using R programming code.
 
 ## [Business Analysis Supermarket Sales](https://rpubs.com/Robato_95/711600)
 * A business analysis of Q3 sales from a supermarket using important metrics and KPIs.
